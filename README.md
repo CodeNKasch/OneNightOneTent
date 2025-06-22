@@ -15,9 +15,14 @@ OneNiteOneTent is an Android application designed to help users find and explore
   [
 
 ## Screenshots
+## Screenshots
 
-![Screenshot of the main map view with markers](oneNiteTent1.png "Map")
-![Screenshot of an open info window for a campground](oneNiteTent2.png "Campground")
+|map|marker|
+|:-:|:-:|
+| ![Screenshot of the main map view with markers](oneNiteTent1.png "Map") | ![Screenshot of an open info window for a campground](oneNiteTent2.png "Campground") |
+
+
+
 
 ## Setup and Build
 

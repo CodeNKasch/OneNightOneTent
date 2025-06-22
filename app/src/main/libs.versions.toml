@@ -1,0 +1,14 @@
+toml
+[versions]
+androidx-core-splashscreen = "1.0.1" # Or your desired version, 1.0.1 is common
+
+[libraries]
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidx-core-splashscreen" }
+
+# If you were trying to group them:
+# androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidx-core-splashscreen" }
+
+[plugins]
+# ...
+[bundles]
+# ...

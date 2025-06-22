@@ -45,4 +45,4 @@ OneNiteOneTent is an Android application designed to help users find and explore
 
 ## License
 
-This project is licensed under the [GNU General Public License v3.0] License - see the `LICENSE.md` file (if you create one) for details.
+This project is licensed under the [GNU General Public License v3.0] License - see the [license](LICENSE.md) file (if you create one) for details.

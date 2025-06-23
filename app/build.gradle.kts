@@ -1,37 +1,42 @@
 import java.util.Properties
-import java.io.FileInputStream
+import java.io.File
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.android.libraries.mapsplatform.secrets.gradle.plugin)
 }
-
-// Function to load properties from local.properties
-fun getApiKey(propertyKey: String): String {
-    val properties = Properties() // Now you can use the shortened name
-    val localPropertiesFile = rootProject.file("local.properties")
+fun getApiKey(propertyKey: String, projectRoot: File): String {
+    val localPropertiesFile = projectRoot.resolve("local.properties")
     if (localPropertiesFile.exists()) {
-        properties.load(FileInputStream(localPropertiesFile))
-        return properties.getProperty(propertyKey, "")
+        val properties = Properties() // Use java.util.Properties
+        try {
+            localPropertiesFile.inputStream().use {
+                properties.load(it)
+            }
+            return properties.getProperty(propertyKey, "").trim()
+        } catch (e: Exception) {
+            println("Warning: Could not load properties from local.properties: ${e.message}")
+        }
+    } else {
+        println("Warning: local.properties file not found at ${localPropertiesFile.path}")
     }
-    return ""
+    return "" // Return empty string if not found or error
 }
 
 android {
-    namespace = "com.example.oneniteonetent"
+    namespace = "com.example.onenighttent"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.oneniteonetent"
+        applicationId = "com.example.onenighttent"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        manifestPlaceholders["MAPS_API_KEY"] = getApiKey("MAPS_API_KEY")
     }
 
     buildTypes {
@@ -51,6 +56,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        compose = true
         viewBinding = true
     }
 }
@@ -58,16 +64,22 @@ android {
 dependencies {
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
     implementation(libs.play.services.maps)
-    implementation(libs.androidx.constraintlayout)
-    implementation("com.google.android.gms:play-services-location:21.2.0") // Or the latest version
-    // For build.gradle.kts
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation(libs.androidx.appcompat)
+//    implementation(libs.androidx.constraintlayout)
     implementation(libs.play.services.location)
-    implementation(libs.protolite.well.known.types)
+//    implementation(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-   }
+//    androidTestImplementation(platform(libs.androidx.compose.bom))
+//    androidTestImplementation(libs.androidx.ui.test.junit4)
+//    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+}

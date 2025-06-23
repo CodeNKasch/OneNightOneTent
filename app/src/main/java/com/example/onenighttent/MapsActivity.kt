@@ -1,11 +1,11 @@
-package com.example.oneniteonetent // Your package name
+package com.example.onenighttent
 
-import java.util.Date
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Build
+import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.Html
 import android.util.Log
@@ -13,18 +13,18 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.example.oneniteonetent.databinding.ActivityMapsBinding
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+import com.example.onenighttent.databinding.ActivityMapsBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.model.Marker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -37,21 +37,23 @@ import java.io.FileWriter
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Date
 import java.util.UUID
-import kotlin.text.toLongOrNull
 
-// Data class to represent a campground feature from your GeoJSON
+
+
+// Data classes for GeoJSON
 data class CampgroundFeature(
     val properties: CampgroundProperties,
     val geometry: CampgroundGeometry
 )
 
 data class CampgroundProperties(
-    val id: String, // This will be a generated ID or parsed from name
+    val id: String, // This is now a generated ID
     val name: String,
-    val image_url: String? = null,
     val description: String?,
-    val link: String?
+    val link: String?,
+    val image_url: String? = null
 )
 
 data class CampgroundGeometry(
@@ -60,17 +62,17 @@ data class CampgroundGeometry(
 )
 
 
+
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    // ... (your existing properties: mMap, binding, fusedLocationClient, requestPermissionLauncher) ...
+    private lateinit var mMap: GoogleMap
+    private lateinit var binding: ActivityMapsBinding
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private val geoJsonUrl = "https://1nitetent.com/app/themes/1nitetent/assets/json/campgrounds.geojson"
     private val cacheFileName = "campgrounds_cache.json"
     private val cacheDurationMillis = 24 * 60 * 60 * 1000 // 24 hours
-
-    private lateinit var mMap: GoogleMap
-    private lateinit var binding: ActivityMapsBinding
-    private lateinit var fusedLocationClient: FusedLocationProviderClient // For getting location
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -79,66 +81,92 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 enableMyLocation()
             } else {
                 Log.d("MapsActivity", "Location permission denied")
-                Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "Location permission denied. Cannot show current location.",
+                    Toast.LENGTH_LONG
+                ).show()
+                // Consider guiding user to settings if permission is permanently denied
             }
         }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMapsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this) // Initialize FusedLocationProviderClient
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
     }
 
+
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-        mMap.uiSettings.isZoomControlsEnabled = true
-        mMap.setInfoWindowAdapter(CustomInfoWindowAdapter()) // Set your custom adapter
-        mMap.setOnMarkerClickListener { marker ->
-            val campground = marker.tag as? CampgroundFeature
-            if (campground != null) {
-                // Option A: Show default info window (if you haven't set a custom one or want it to still appear)
-                // marker.showInfoWindow() // Usually happens by default, but you can explicitly call it.
-
-                // Option B: Do something else, e.g., show a Toast with more details
-                Toast.makeText(
-                    this,
-                    "Tapped on: ${campground.properties.name}\nLink: ${campground.properties.link}",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                // Option C: Launch a BottomSheet or a new Activity
-                // Example:
-                // val intent = Intent(this, CampgroundDetailActivity::class.java)
-                // intent.putExtra("CAMPGROUND_ID", campground.properties.id) // Pass some identifier
-                // startActivity(intent)
-
-                // If you handle the click completely and don't want the default behavior
-                // (which is to center the map on the marker and show the info window), return true.
-                // If you return false, the default behavior will also occur.
-                return@setOnMarkerClickListener false // Let default behavior (show info window) also happen
-            }
-            return@setOnMarkerClickListener false // For markers without valid tags or if you want default behavior
-        }
         Log.d("MapsActivity", "onMapReady: Map is ready!")
 
-        // Check for location permission when map is ready
-        checkLocationPermissionAndProceed()
+        // Enable UI settings
+        mMap.uiSettings.isZoomControlsEnabled = true
 
-        // Load campground data
+        mMap.setInfoWindowAdapter(CustomInfoWindowAdapter())
+
+        checkLocationPermissionAndProceed()
         loadCampgroundData()
     }
 
-    private fun loadCampgroundData() {
-        Toast.makeText(this, "loading ...", Toast.LENGTH_SHORT).show()
+    private fun checkLocationPermissionAndProceed() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                Log.d("MapsActivity", "ACCESS_FINE_LOCATION permission already granted.")
+                enableMyLocation()
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
+                Log.d("MapsActivity", "Showing rationale for ACCESS_FINE_LOCATION.")
+                // In a real app, show a dialog explaining why the permission is needed
+                Toast.makeText(
+                    this,
+                    "Location permission is needed to show your current location.",
+                    Toast.LENGTH_LONG
+                ).show()
+                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            else -> {
+                Log.d("MapsActivity", "Requesting ACCESS_FINE_LOCATION permission.")
+                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+    }
 
-        GlobalScope.launch(Dispatchers.IO) { // Perform network and file operations off the main thread
+    @SuppressLint("MissingPermission") // Suppressed because permission is checked before calling
+    private fun enableMyLocation() {
+        if (!::mMap.isInitialized) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            mMap.isMyLocationEnabled = true
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                location?.let {
+                    val currentLatLng = LatLng(it.latitude, it.longitude)
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 13f))
+                    Log.d("MapsActivity", "Moved camera to current location: $currentLatLng")
+                } ?: run {
+                    Log.d("MapsActivity", "Last known location is null.")
+                    // Optionally, move to a default location if current location is unavailable
+                }
+            }
+        } else {
+            Log.d("MapsActivity", "Location permission not granted, cannot enable my location.")
+        }
+    }
+
+    private fun loadCampgroundData() {
+        GlobalScope.launch(Dispatchers.IO) {
             val cachedData = getCachedCampgroundData()
             if (cachedData != null) {
                 Log.d("MapsActivity", "Using cached campground data.")
@@ -158,12 +186,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         }
                     } else {
                         Log.e("MapsActivity", "Failed to fetch GeoJSON data.")
-                        // Optionally, try to load from an older cache if primary fetch fails
-                        // and you want to show stale data as a last resort.
                     }
                 } catch (e: Exception) {
                     Log.e("MapsActivity", "Error fetching or parsing GeoJSON", e)
-                    // Consider loading from an older cache here too if applicable
                 }
             }
         }
@@ -177,12 +202,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             Log.d("MapsActivity", "Cache file or metadata not found.")
             return null
         }
-
         try {
             val lastFetchTime = metadataFile.readText().toLongOrNull()
             if (lastFetchTime == null || (Date().time - lastFetchTime) > cacheDurationMillis) {
                 Log.d("MapsActivity", "Cache expired or invalid metadata.")
-                cacheFile.delete() // Delete outdated cache
+                cacheFile.delete()
                 metadataFile.delete()
                 return null
             }
@@ -205,13 +229,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private suspend fun fetchGeoJson(url: URL): String? {
-        return withContext(Dispatchers.IO) { // Ensure this runs on a background thread
+        return withContext(Dispatchers.IO) {
             var connection: HttpURLConnection? = null
             try {
                 connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 10000 // 10 seconds
-                connection.readTimeout = 10000  // 10 seconds
-
+                connection.connectTimeout = 15000 // 15 seconds
+                connection.readTimeout = 15000  // 15 seconds
                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                     val reader = BufferedReader(InputStreamReader(connection.inputStream))
                     val response = reader.use { it.readText() }
@@ -230,7 +253,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-
     private fun parseGeoJson(jsonData: String): List<CampgroundFeature> {
         val features = mutableListOf<CampgroundFeature>()
         try {
@@ -239,19 +261,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             for (i in 0 until featuresArray.length()) {
                 val featureObject = featuresArray.getJSONObject(i)
-                val propertiesObject = featureObject.getJSONObject("properties") // This is correct
+                val propertiesObject = featureObject.getJSONObject("properties")
                 val geometryObject = featureObject.getJSONObject("geometry")
                 val coordinatesArray = geometryObject.getJSONArray("coordinates")
 
-                // Create a unique ID for each feature since it's not in the properties
                 val generatedId = UUID.randomUUID().toString()
 
                 val properties = CampgroundProperties(
-                    id = generatedId, // Use the generated ID
+                    id = generatedId,
                     name = propertiesObject.getString("name"),
-                    description = propertiesObject.optString("description", null), // Get description
-                    link = propertiesObject.optString("link", null),             // Get link
-                    image_url = propertiesObject.optString("image_url", null)    // image_url might not be present in all
+                    description = propertiesObject.optString("description", null),
+                    link = propertiesObject.optString("link", null),
+                    image_url = propertiesObject.optString("image_url", null)
                 )
 
                 val coordinates = listOf(
@@ -268,7 +289,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             Log.d("MapsActivity", "Successfully parsed ${features.size} campgrounds.")
         } catch (e: Exception) {
             Log.e("MapsActivity", "Error parsing GeoJSON", e)
-            // Handle parsing error, maybe return empty list or throw custom exception
         }
         return features
     }
@@ -281,110 +301,30 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         for (campground in campgrounds) {
             if (campground.geometry.type == "Point") {
                 val position = LatLng(campground.geometry.coordinates[1], campground.geometry.coordinates[0])
-                mMap.addMarker(
+                val marker = mMap.addMarker(
                     MarkerOptions()
                         .position(position)
                         .title(campground.properties.name)
-                        // Add a snippet - e.g., the first few words of the description
-                        .snippet(campground.properties.description?.take(80) + "...") // Show first 80 chars
-                )?.tag = campground // Store the full campground data in the marker's tag
+                    // Snippet can be set here if not using a custom info window or as a fallback
+                )
+                marker?.tag = campground // Store the full campground data for the info window
             }
         }
         Log.d("MapsActivity", "Added ${campgrounds.size} campground markers to the map.")
     }
 
-    private fun checkLocationPermissionAndProceed() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                // You can use the API that requires the permission.
-                Log.d("MapsActivity", "ACCESS_FINE_LOCATION permission already granted.")
-                enableMyLocation()
-            }
-            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
-                // In an educational UI, explain to the user why your app requires this
-                // permission for a specific feature to behave as expected, and what
-                // features are disabled if it's declined. In this UI, include a
-                // "cancel" or "no thanks" button that lets the user continue
-                // using your app without granting the permission.
-                Log.d("MapsActivity", "Showing rationale for ACCESS_FINE_LOCATION.")
-                // For simplicity, directly requesting again. In a real app, show a dialog.
-                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                Toast.makeText(this, "Location permission is needed to show your current location.", Toast.LENGTH_LONG).show()
-
-            }
-            else -> {
-                // Directly ask for the permission.
-                Log.d("MapsActivity", "Requesting ACCESS_FINE_LOCATION permission.")
-                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
-        }
-    }
-
-    @SuppressLint("MissingPermission") // Suppress warning as permission is checked by enableMyLocation
-    private fun enableMyLocation() {
-        // Double check permission just in case, though it should be granted if this is called
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-            == PackageManager.PERMISSION_GRANTED) {
-
-            mMap.isMyLocationEnabled = true // Enable the My Location layer (blue dot)
-            Log.d("MapsActivity", "My Location layer enabled.")
-
-            // Get last known location and move camera
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location: Location? ->
-                    if (location != null) {
-                        val currentLatLng = LatLng(location.latitude, location.longitude)
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f)) // Zoom level 15
-                        Log.d("MapsActivity", "Moved camera to last known location: $currentLatLng")
-                        // You could also add a marker here if desired, but the blue dot serves this purpose
-                        // mMap.addMarker(MarkerOptions().position(currentLatLng).title("My Current Location"))
-                    } else {
-                        Log.d("MapsActivity", "Last known location is null. May need to request updates or device location is off.")
-                        Toast.makeText(this, "Could not get current location. Make sure location is enabled on your device.", Toast.LENGTH_LONG).show()
-                        // Fallback: If no last location, maybe zoom to a default area or do nothing further.
-                        // val defaultLocation = LatLng(37.4220, -122.0841) // Googleplex
-                        // mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, 10f))
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.e("MapsActivity", "Error trying to get last GPS location", e)
-                    Toast.makeText(this, "Error getting location: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            Log.d("MapsActivity", "enableMyLocation called but permission not granted (should not happen if logic is correct).")
-            // This case should ideally not be reached if checkLocationPermissionAndProceed is called first
-            // You might want to re-request permission or guide the user.
-        }
-    }
-
-    // Inside MapsActivity class
+    // Inner class for Custom Info Window
     inner class CustomInfoWindowAdapter : GoogleMap.InfoWindowAdapter {
-
         private val window: View = layoutInflater.inflate(R.layout.custom_info_window, null)
 
         override fun getInfoWindow(marker: Marker): View? {
-            // This method is called first. If it returns a view, that view is used.
-            // If it returns null, then getInfoContents() is called.
-            // We'll populate the view in getInfoContents for simplicity here.
             renderWindowText(marker, window)
             return window
         }
 
         override fun getInfoContents(marker: Marker): View? {
-            // This method is called if getInfoWindow() returns null.
-            // It's used to update the contents of the default info window frame.
-            // We are using a fully custom window, so this could also return null
-            // if all rendering is done in getInfoWindow.
-            // However, to be safe and demonstrate, let's populate here too.
-            // If getInfoWindow returns a view, this method is typically not called.
-            renderWindowText(marker, window) // Or inflate and populate a different view for contents only
-            return null // Return null if you want to use the default info window frame with custom contents
-            // For a fully custom window, the logic in getInfoWindow should be primary.
+            // Render to the default frame if getInfoWindow returns null (not our case here)
+            return null
         }
 
         private fun renderWindowText(marker: Marker, view: View) {
@@ -392,12 +332,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             val descriptionTextView = view.findViewById<TextView>(R.id.info_window_description)
             val linkTextView = view.findViewById<TextView>(R.id.info_window_link)
 
-            val campground = marker.tag as? CampgroundFeature // Retrieve the data from the tag
+            val campground = marker.tag as? CampgroundFeature
 
             if (campground != null) {
                 titleTextView.text = campground.properties.name
 
-                // --- Display HTML description ---
                 val htmlDescription = campground.properties.description
                 if (!htmlDescription.isNullOrEmpty()) {
                     descriptionTextView.text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -409,7 +348,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 } else {
                     descriptionTextView.text = "No description available."
                 }
-                // --- End HTML description ---
 
                 if (!campground.properties.link.isNullOrEmpty()) {
                     linkTextView.text = "Contact: ${campground.properties.link}"
@@ -419,9 +357,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
             } else {
                 titleTextView.text = marker.title ?: "Unknown Location"
-                descriptionTextView.text = marker.snippet ?: ""
+                descriptionTextView.text = marker.snippet ?: "" // Fallback to snippet
                 linkTextView.visibility = View.GONE
             }
+
+
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.example.oneniteonetent
+package com.example.onenighttent
 
 import org.junit.Test
 

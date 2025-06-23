@@ -84,4 +84,8 @@ dependencies {
 //    androidTestImplementation(libs.androidx.ui.test.junit4)
 //    debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4") // Or latest
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4") // For LiveData, if you prefer
+    implementation("androidx.activity:activity-ktx:1.9.1") // For by viewModels() delegate
+
 }

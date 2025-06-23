@@ -4,27 +4,23 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Location
-import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.Html
 import android.util.Log
-import android.view.View
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-
+import com.example.onenighttent.databinding.ActivityMapsBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
-import com.example.onenighttent.databinding.ActivityMapsBinding
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -39,7 +35,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
 import java.util.UUID
-
 
 
 // Data classes for GeoJSON
@@ -63,7 +58,7 @@ data class CampgroundGeometry(
 
 
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarkerClickListener {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityMapsBinding
@@ -111,11 +106,51 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         // Enable UI settings
         mMap.uiSettings.isZoomControlsEnabled = true
 
-        mMap.setInfoWindowAdapter(CustomInfoWindowAdapter())
+        mMap.setOnMarkerClickListener(this)
+        // mMap.setInfoWindowAdapter(CustomInfoWindowAdapter())
 
         checkLocationPermissionAndProceed()
         loadCampgroundData()
     }
+
+
+    override fun onMarkerClick(marker: Marker): Boolean {
+        // Retrieve data associated with the marker.
+        // You could have stored your CampgroundProperties object (or just relevant fields) in the marker's tag.
+        val campgroundData = marker.tag as? CampgroundFeature // Example: if you stored CampgroundFeature in tag
+        // Or if you only stored specific data in the tag, retrieve it.
+        // If you didn't use the tag, you might need to find the data based on marker.id or marker.title
+
+        val title = marker.title ?: "Details"
+        var description: String? = null
+        var link: String? = null
+
+        if (campgroundData != null) {
+            // Assuming CampgroundFeature has a 'properties' field of type CampgroundProperties
+            description = campgroundData.properties.description?.let {
+                Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString()
+            }
+            link = campgroundData.properties.link // Links are typically not HTML, but if they are, handle similarly
+        } else {
+            // Fallback if tag data is not available or not in the expected format
+            // You might fetch data based on marker.id from a local list/database
+            Log.w("MapsActivity", "Campground data not found in marker tag for: ${marker.title}")
+            // For now, we can use the snippet as a fallback if you have it
+            // Assuming snippet might also contain HTML
+            description = marker.snippet?.let {
+                Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString()
+            }
+        }
+
+
+        val bottomSheet = MarkerInfoBottomSheetFragment.newInstance(title, description, link)
+        bottomSheet.show(supportFragmentManager, "MarkerInfoBottomSheet")
+
+        // Return true to indicate that we have consumed the event and don't want the default behavior
+        // (which is to center the map on the marker and open the info window).
+        return true
+    }
+
 
     private fun checkLocationPermissionAndProceed() {
         when {
@@ -311,57 +346,5 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
         Log.d("MapsActivity", "Added ${campgrounds.size} campground markers to the map.")
-    }
-
-    // Inner class for Custom Info Window
-    inner class CustomInfoWindowAdapter : GoogleMap.InfoWindowAdapter {
-        private val window: View = layoutInflater.inflate(R.layout.custom_info_window, null)
-
-        override fun getInfoWindow(marker: Marker): View? {
-            renderWindowText(marker, window)
-            return window
-        }
-
-        override fun getInfoContents(marker: Marker): View? {
-            // Render to the default frame if getInfoWindow returns null (not our case here)
-            return null
-        }
-
-        private fun renderWindowText(marker: Marker, view: View) {
-            val titleTextView = view.findViewById<TextView>(R.id.info_window_title)
-            val descriptionTextView = view.findViewById<TextView>(R.id.info_window_description)
-            val linkTextView = view.findViewById<TextView>(R.id.info_window_link)
-
-            val campground = marker.tag as? CampgroundFeature
-
-            if (campground != null) {
-                titleTextView.text = campground.properties.name
-
-                val htmlDescription = campground.properties.description
-                if (!htmlDescription.isNullOrEmpty()) {
-                    descriptionTextView.text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        Html.fromHtml(htmlDescription, Html.FROM_HTML_MODE_LEGACY)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        Html.fromHtml(htmlDescription)
-                    }
-                } else {
-                    descriptionTextView.text = "No description available."
-                }
-
-                if (!campground.properties.link.isNullOrEmpty()) {
-                    linkTextView.text = "Contact: ${campground.properties.link}"
-                    linkTextView.visibility = View.VISIBLE
-                } else {
-                    linkTextView.visibility = View.GONE
-                }
-            } else {
-                titleTextView.text = marker.title ?: "Unknown Location"
-                descriptionTextView.text = marker.snippet ?: "" // Fallback to snippet
-                linkTextView.visibility = View.GONE
-            }
-
-
-        }
     }
 }

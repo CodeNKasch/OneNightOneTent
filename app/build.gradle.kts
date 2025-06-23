@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
 //    implementation(libs.androidx.constraintlayout)
     implementation(libs.play.services.location)
+    implementation(libs.material)
 //    implementation(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

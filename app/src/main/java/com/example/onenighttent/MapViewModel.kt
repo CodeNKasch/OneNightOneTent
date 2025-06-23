@@ -25,53 +25,21 @@ class MapViewModel : ViewModel() {
     val errorMessages: LiveData<String?> = _errorMessages
 
     companion object {
-        private const val TAG = "com.example.onenighttent.MapViewModel"
-        private const val GEOJSON_URL =
-            "https://1nitetent.com/app/themes/1nitetent/assets/json/campgrounds.geojson"
+        private const val TAG = "MapViewModel"
+        private const val GEOJSON_URL = "https://1nitetent.com/app/themes/1nitetent/assets/json/campgrounds.geojson"
     }
 
     init {
         fetchCampgroundData()
     }
 
-    fun fetchCampgroundData() {
+    private fun fetchCampgroundData() {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessages.value = null // Clear previous errors
             Log.d(TAG, "Starting to load campground data from URL...")
             try {
-                val data: CampgroundData? = withContext(Dispatchers.IO) {
-                    var urlConnection: HttpURLConnection? = null
-                    try {
-                        val url = URL(GEOJSON_URL)
-                        urlConnection = url.openConnection() as HttpURLConnection
-                        urlConnection.requestMethod = "GET"
-                        urlConnection.connectTimeout = 15000
-                        urlConnection.readTimeout = 10000
-
-                        val responseCode = urlConnection.responseCode
-                        if (responseCode == HttpURLConnection.HTTP_OK) {
-                            val inputStream = urlConnection.inputStream
-                            val reader = InputStreamReader(inputStream)
-                            Gson().fromJson(reader, CampgroundData::class.java)
-                        } else {
-                            Log.e(TAG, "HTTP error code: $responseCode from $GEOJSON_URL")
-                            // Post error to be handled by UI
-                            withContext(Dispatchers.Main) {
-                                _errorMessages.value = "HTTP error: $responseCode"
-                            }
-                            null
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error during network request or parsing", e)
-                        withContext(Dispatchers.Main) {
-                            _errorMessages.value = "Network error: ${e.localizedMessage}"
-                        }
-                        null
-                    } finally {
-                        urlConnection?.disconnect()
-                    }
-                }
+                val data = loadCampgroundData();
 
                 if (data != null) {
                     Log.d(TAG, "Successfully loaded and parsed ${data.features.size} campgrounds.")
@@ -96,5 +64,42 @@ class MapViewModel : ViewModel() {
     // Call this method if you want to clear a shown error message from the UI
     fun clearErrorMessage() {
         _errorMessages.value = null
+    }
+
+    private suspend fun loadCampgroundData(): CampgroundData? {
+        val data: CampgroundData? = withContext(Dispatchers.IO) {
+
+            var urlConnection: HttpURLConnection? = null
+            try {
+                val url = URL(GEOJSON_URL)
+                urlConnection = url.openConnection() as HttpURLConnection
+                urlConnection.requestMethod = "GET"
+                urlConnection.connectTimeout = 15000
+                urlConnection.readTimeout = 10000
+
+                val responseCode = urlConnection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val inputStream = urlConnection.inputStream
+                    val reader = InputStreamReader(inputStream)
+                    Gson().fromJson(reader, CampgroundData::class.java)
+                } else {
+                    Log.e(TAG, "HTTP error code: $responseCode from $url")
+                    // Post error to be handled by UI
+                    withContext(Dispatchers.Main) {
+                        _errorMessages.value = "HTTP error: $responseCode"
+                    }
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during network request or parsing", e)
+                withContext(Dispatchers.Main) {
+                    _errorMessages.value = "Network error: ${e.localizedMessage}"
+                }
+                null
+            } finally {
+                urlConnection?.disconnect()
+            }
+        }
+        return data
     }
 }

@@ -87,5 +87,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4") // Or latest
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4") // For LiveData, if you prefer
     implementation("androidx.activity:activity-ktx:1.9.1") // For by viewModels() delegate
+    //implementation("androidx.core:core-splashscreen:1.0.1") // Or the latest version
 
 }

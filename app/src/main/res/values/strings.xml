@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">OneNightTent</string>
-    <string name="title_activity_maps">MapsActivity</string>
+    <string name="title_activity_maps">OneNightTent</string>
     <string name="close_button_info">x</string>
 </resources>
